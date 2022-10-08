@@ -1,13 +1,15 @@
+from platform import release
 import pygame
 import math
 
 pygame.init()
 
-HEIGHT = 400
-WIDTH = 400
+HEIGHT = 600
+WIDTH = 600
 WHITE = (255, 255, 255)
 GRAY = (25, 25, 25)
 BLACK = (0, 0, 0)
+font = pygame.font.SysFont('Arial', 25)
 
 screen = pygame.display.set_mode([WIDTH+200, HEIGHT])
 pygame.display.set_caption('Ray Tracing')
@@ -19,7 +21,10 @@ walls = list()
 rays = list()
 
 pi2 = 2 * 3.14
-n = 360
+n = 720
+using_rayt = False
+drawing = False
+prev_pos = None
 
 class Wall():
     def __init__(self, x1, y1, x2, y2):
@@ -39,9 +44,9 @@ class Ray():
     def draw(self, end_p):
         self.end_pos = end_p
         pygame.draw.line(screen, WHITE, self.start_pos, self.end_pos)
-        
 
-    def check_intersection(self, wall, mouse_pos, i):
+
+    def check_intersection(self, wall):
 
         x3 = self.start_pos[0]
         y3 = self.start_pos[1]
@@ -77,18 +82,38 @@ def distance_from_points(p1, p2):
 
     return math.sqrt(pow((x1-x2), 2)+pow((y1-y2), 2))
 
+wall1 = Wall(0, 0, WIDTH, 0)
+wall2 = Wall(WIDTH, 0, WIDTH, HEIGHT)
+wall3 = Wall(WIDTH, HEIGHT, 0, HEIGHT)
+wall4 = Wall(0, HEIGHT, 0, 0)
 
-wall1 = Wall(150, 50, 100, 250)
-wall2 = Wall(350, 50, 350, 0)
-wall3 = Wall(0, 0, WIDTH, 0)
-wall4 = Wall(WIDTH, 0, WIDTH, HEIGHT)
-wall5 = Wall(WIDTH, HEIGHT, 0, HEIGHT)
-wall6 = Wall(0, HEIGHT, 0, 0)
+obstacle_wall1 = Wall(0, 0, 100, 100)
+obstacle_wall2 = Wall(100, 100, 100, 300)
+obstacle_wall3 = Wall(300, 0, 250, 150)
+obstacle_wall4 = Wall(300, HEIGHT, 250, HEIGHT-150)
 
-# , wall3, wall4, wall5, wall6
+walls.extend([wall1, wall2, wall3, wall4, obstacle_wall1, obstacle_wall2, obstacle_wall3, obstacle_wall4])
 
-walls.extend([wall1, wall2, wall3, wall4, wall5, wall6])
+# ray tracing btn
+pygame.draw.rect(screen, BLACK, pygame.Rect(WIDTH+25, 25, 150, 50))
+btn_text = font.render('Ray Tracing', True, WHITE)
+btn_text_rect = btn_text.get_rect()
+btn_text_rect.center = (WIDTH+100, 50)
+screen.blit(btn_text, btn_text_rect)
 
+# make walls btn
+pygame.draw.rect(screen, BLACK, pygame.Rect(WIDTH+25, 100, 150, 50))
+btn_text = font.render('Make Walls', True, WHITE)
+btn_text_rect = btn_text.get_rect()
+btn_text_rect.center = (WIDTH+100, 125)
+screen.blit(btn_text, btn_text_rect)
+
+# reset btn
+pygame.draw.rect(screen, BLACK, pygame.Rect(WIDTH+25, 175, 150, 50))
+btn_text = font.render('Reset', True, WHITE)
+btn_text_rect = btn_text.get_rect()
+btn_text_rect.center = (WIDTH+100, 200)
+screen.blit(btn_text, btn_text_rect)
 
 while running:
 
@@ -107,31 +132,62 @@ while running:
             y = math.sin(i / n * pi2) * 1 + mouse_pos[1]
             rays.append(Ray(mouse_pos, (x, y)))
 
-    using_rayt = True
 
-    if 0 < mouse_pos[0] < WIDTH and 0 < mouse_pos[1] < HEIGHT and using_rayt:       
-        i = 0
-        for ray in rays:
-            min_d = math.inf
-            record_p = list()
-            for wall in walls:
-                point = ray.check_intersection(wall, mouse_pos, i)
+    if pygame.mouse.get_pressed()[0]:
+        released = False
+        if (WIDTH+25 < mouse_pos[0] < WIDTH+175):
 
-                if point:
+            if (25 < mouse_pos[1] < 75):
+                using_rayt = True
+                drawing = False
 
-                    d = distance_from_points(mouse_pos, point)
+            elif (100 < mouse_pos[1] < 150):
+                drawing = True
+                using_rayt = False
+                n = 36
+                walls = [wall1, wall2, wall3, wall4]
+                pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, WIDTH, HEIGHT))
 
-                    if d < min_d:
-                        min_d = d
-                        record_p = point
+            elif (175 < mouse_pos[1] < 225):
+                using_rayt = False
+                drawing = False
+                prev_pos = None
+                walls = [wall1, wall2, wall3, wall4, obstacle_wall1, obstacle_wall2, obstacle_wall3, obstacle_wall4]
+                n = 360
+                pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, WIDTH, HEIGHT))
 
-            if record_p != list():
-                ray.draw(record_p)    
+    if using_rayt:
+        if 0 < mouse_pos[0] < WIDTH and 0 < mouse_pos[1] < HEIGHT:       
+            i = 0
+            for ray in rays:
+                min_d = math.inf
+                record_p = list()
+                for wall in walls:
+                    point = ray.check_intersection(wall)
 
-            i += 1
+                    if point:
+
+                        d = distance_from_points(mouse_pos, point)
+
+                        if d < min_d:
+                            min_d = d
+                            record_p = point
+
+                if record_p != list():
+                    ray.draw(record_p)    
+
+                i += 1
+
+    elif drawing == True:
+        if 0 < mouse_pos[0] < WIDTH and pygame.mouse.get_pressed()[0]:
+            new_wall = Wall(prev_pos[0] if prev_pos != None else mouse_pos[0], prev_pos[1] if prev_pos != None else mouse_pos[1], mouse_pos[0], mouse_pos[1])
+            walls.append(new_wall)
+            pygame.draw.line(screen, WHITE, prev_pos if prev_pos != None else mouse_pos, mouse_pos, 1)
+            prev_pos = mouse_pos
+            
 
 
     pygame.display.update()
-    pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, WIDTH, HEIGHT))
+    if using_rayt:
+        pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, WIDTH, HEIGHT))
     rays = list()
-    points = list()
